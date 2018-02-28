@@ -2,30 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Components\StatisticHelper;
 use App\Models\BannerStatistic;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 
 class StatisticController extends Controller
 {
-    public function show(Request $request, $banner_id)
+    public function show(Request $request, int $banner_id, string $group)
     {
-        /** @var Collection $statistic */
-        $statistic = BannerStatistic::where('banner_id', '=', $banner_id)
-            ->orderBy('date', 'desc')
-            ->get(['all', 'unique', 'date']);
+        $from = Carbon::parse($request->get('from') ?: '2000-01-01');
+        $to = Carbon::parse($request->get('to') ?: date('Y-m-d H:i:s'));
 
-        $bannerComponent = app()->make('banner');
-
-        //FIXME скрипт на запись в БД запускается каждые 5 минут, так что в течении нескольких минут даннык на графики за предыдущий час могут не вывестись!!!
-
-        $time = time();
-        //За текущий час берем статистику из кеша
-        $statistic->add([
-            'all' => $bannerComponent->getAll($banner_id, $time) ?: 0,
-            'unique' => $bannerComponent->getUnique($banner_id, $time) ?: 0,
-            'date' => date('Y-m-d H:00:00', $time)
-        ]);
+        $statistic = StatisticHelper::getBannerStatistic($banner_id, $group, $from, $to);
 
         return response()->json($statistic);
     }

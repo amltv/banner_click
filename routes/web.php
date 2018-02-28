@@ -12,4 +12,5 @@
 */
 
 Route::get('/banner/click/{banner_id}', 'BannerController@click')->where(['banner_id' => '[0-9]+']);
-Route::get('/statistic/banner/{banner_id}', 'StatisticController@show')->where(['banner_id' => '[0-9]+']);
+Route::get('/statistic/banner/{banner_id}/{group}', 'StatisticController@show')
+    ->where(['banner_id' => '[0-9]+', 'group' => '\w+']);

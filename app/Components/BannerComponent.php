@@ -28,17 +28,23 @@ class BannerComponent
      */
     public function click(int $banner_id, int $user_id)
     {
-        //TODO Добавить устаревание ключей
+        $time = time();
 
         //Считаем все клики
-        $pipeline = Redis::pipeline()->incr($this->buildKeyString(BannerComponent::TYPE_ALL, $banner_id, time()));;
+        $keyAllClicks = $this->buildKeyString(BannerComponent::TYPE_ALL, $banner_id, $time);
+        $pipeline = Redis::pipeline()->incr($keyAllClicks);
+        $pipeline->expire($keyAllClicks, $this->config['expireTime']);
 
         //Считаем только уникальные клики
-        $unique_key = $this->buildKeyString(BannerComponent::TYPE_UNIQUE, $banner_id, time(), $user_id);
+        //Считаем что повторный клик после 00-00 следующего дня является уникальным кликом
+        $unique_key = $this->buildKeyStringForUser(BannerComponent::TYPE_UNIQUE, $banner_id, $time, $user_id);
         if (Redis::incr($unique_key) === 1) {//incr для исключения повторного засчета при одновременном нажатии на банер
-            //Считаем что уникальный клик действителен в течении 24 часов с момента предыдущего клика
             $pipeline->expire($unique_key, 86400);
-            $pipeline->incr($this->buildKeyString(BannerComponent::TYPE_UNIQUE, $banner_id, time()));
+
+            //Увеличиваем счетчик для уникальных ключей
+            $keyUniqueClicks = $this->buildKeyString(BannerComponent::TYPE_UNIQUE, $banner_id, $time);
+            $pipeline->incr($keyUniqueClicks);
+            $pipeline->expire($keyUniqueClicks, $this->config['expireTime']);
         }
 
         $pipeline->execute();
@@ -49,9 +55,9 @@ class BannerComponent
      * @param int $timestamp
      * @return mixed
      */
-    public function getAll(int $banner_id, int $timestamp)
+    public function getAll(int $banner_id, int $timestamp) : int
     {
-        return Redis::get($this->buildKeyString(BannerComponent::TYPE_ALL, $banner_id, $timestamp));
+        return Redis::get($this->buildKeyString(BannerComponent::TYPE_ALL, $banner_id, $timestamp)) ?:0 ;
     }
 
     /**
@@ -59,20 +65,41 @@ class BannerComponent
      * @param int $timestamp
      * @return mixed
      */
-    public function getUnique(int $banner_id, int $timestamp)
+    public function getUnique(int $banner_id, int $timestamp) : int
     {
-        return Redis::get($this->buildKeyString(BannerComponent::TYPE_UNIQUE, $banner_id, $timestamp));
+        return Redis::get($this->buildKeyString(BannerComponent::TYPE_UNIQUE, $banner_id, $timestamp)) ?: 0;
     }
 
     /**
+     * Возвращает ключ для хранения кликов с групировкой по часам
+     *
      * @param string $name
      * @param int $banner_id
      * @param int $timestamp
-     * @param int|null $user_id
      * @return string
      */
-    protected function buildKeyString(string $name, int $banner_id, int $timestamp, int $user_id = null) : string
+    protected function buildKeyString(string $name, int $banner_id, int $timestamp) : string
     {
-        return "$name:$banner_id:$user_id:" . date('YmdH', $timestamp);
+        return "$name:$banner_id:" . date('YmdH', $timestamp);
+    }
+
+    /**
+     * Возвращает ключ для хранения клика пользователя
+     * Ключ возвращается в формате Ymd что обеспечивает нам учет клика в интервале 00-00 до 00-00 следующего дня
+     *
+     * @param string $name
+     * @param int $banner_id
+     * @param int $timestamp
+     * @param int $user_id
+     * @return string
+     */
+    protected function buildKeyStringForUser(
+        string $name,
+        int $banner_id,
+        int $timestamp,
+        int $user_id
+    ) : string
+    {
+        return "$name:$banner_id:$user_id:" . date('Ymd', $timestamp);
     }
 }

@@ -27,7 +27,7 @@ class Kernel extends ConsoleKernel
         // $schedule->command('inspire')
         //          ->hourly();
 
-        $schedule->command('banner:save_to_db')->everyFiveMinutes();
+        $schedule->command('banner:save_to_db')->hourly();
     }
 
     /**

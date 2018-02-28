@@ -78,7 +78,7 @@ class SaveToDbCommand extends Command
         $nowDate = Carbon::now();
         $lastDate = Carbon::parse($lastBannerStatistic->date);
 
-        while ($lastDate->diffInHours($nowDate) > 0) {
+        while ($lastDate->diffInHours($nowDate, false) >= 0) {
             $lastDate->addHour();
             $time = $lastDate->getTimestamp();
 
